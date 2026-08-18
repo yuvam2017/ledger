@@ -4,6 +4,9 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>The Ledger — Link Archive</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%2064%2064%22%3E%3Crect%20width%3D%2264%22%20height%3D%2264%22%20rx%3D%2214%22%20fill%3D%22%231F6F5C%22/%3E%3Cpath%20d%3D%22M32%2012%20L52%2032%20L32%2052%20L12%2032%20Z%22%20fill%3D%22%23FFFFFF%22/%3E%3C/svg%3E">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
@@ -716,4 +719,488 @@
     var pendingCount = state.data.pending.length;
     var line = state.data.links.length + " link" + (state.data.links.length===1?"":"s") +
       " across " + cats.length + " categor" + (cats.length===1?"y":"ies");
-    if(pendingCount) line += "  ·  " + pendingCount + " pending review
+    if(pendingCount) line += "  ·  " + pendingCount + " pending review";
+    document.getElementById('statLine').textContent = line;
+  }
+
+  function renderTabs(){
+    var bar = document.getElementById('tabsBar');
+    var cats = getCategories();
+    var html = "";
+
+    html += tabHtml(TAB_ALL, "All", state.data.links.length, false);
+    cats.forEach(function(c){
+      var count = state.data.links.filter(function(l){ return l.category === c; }).length;
+      html += tabHtml(c, c, count, false);
+    });
+    if(state.data.pending.length > 0){
+      html += tabHtml(TAB_PENDING, "Pending", state.data.pending.length, true);
+    }
+
+    if(!cats.length && !state.data.pending.length){
+      bar.innerHTML = "";
+      return;
+    }
+
+    bar.innerHTML = html;
+
+    Array.prototype.forEach.call(bar.querySelectorAll('.tab'), function(el){
+      el.addEventListener('click', function(){
+        state.currentTab = el.getAttribute('data-tab');
+        renderAll();
+      });
+    });
+  }
+
+  function tabHtml(id, label, count, isPending){
+    var active = state.currentTab === id;
+    var cls = 'tab' + (active ? ' active' : '') + (isPending ? ' pending-tab' : '');
+    var icon;
+    if(id === TAB_ALL){
+      icon = '<span class="cat-avatar all-avatar">≡</span>';
+    } else if(id === TAB_PENDING){
+      icon = '<span class="cat-avatar pending-avatar">!</span>';
+    } else {
+      icon = avatarHtml(label);
+    }
+    return '<div class="'+cls+'" data-tab="'+escapeHtml(id)+'">' +
+      icon + escapeHtml(label) + ' <span class="badge">'+count+'</span></div>';
+  }
+
+  function renderDatalists(){
+    var catList = document.getElementById('categoryOptions');
+    var subList = document.getElementById('subcategoryOptions');
+    catList.innerHTML = getCategories().map(function(c){ return '<option value="'+escapeHtml(c)+'">'; }).join('');
+    subList.innerHTML = getSubcategories(null).map(function(c){ return '<option value="'+escapeHtml(c)+'">'; }).join('');
+  }
+
+  function matchesSearch(item){
+    if(!state.search) return true;
+    var q = state.search.toLowerCase();
+    return (item.title||"").toLowerCase().indexOf(q) > -1 ||
+           (item.description||"").toLowerCase().indexOf(q) > -1 ||
+           (item.url||"").toLowerCase().indexOf(q) > -1 ||
+           (item.category||"").toLowerCase().indexOf(q) > -1 ||
+           (item.subcategory||"").toLowerCase().indexOf(q) > -1;
+  }
+
+  function renderContent(){
+    var area = document.getElementById('contentArea');
+
+    if(!getCategories().length && !state.data.pending.length){
+      area.innerHTML = emptyStateHtml(
+        "◆",
+        "Your ledger is empty",
+        "Add your first link, or import a bookmarks HTML file exported from your browser to get started."
+      );
+      return;
+    }
+
+    if(state.currentTab === TAB_PENDING){
+      renderPendingContent(area);
+      return;
+    }
+
+    var isAll = state.currentTab === TAB_ALL;
+    var relevantLinks = state.data.links.filter(function(l){
+      return (isAll || l.category === state.currentTab) && matchesSearch(l);
+    });
+
+    if(!relevantLinks.length){
+      area.innerHTML = emptyStateHtml("○", "Nothing here yet",
+        state.search ? "No links match your search in this view." : "No links saved in this category yet.");
+      return;
+    }
+
+    // group by category (if All) then subcategory
+    var groups = {};
+    relevantLinks.forEach(function(l){
+      var catKey = isAll ? (l.category || "Uncategorized") : (l.subcategory || "General");
+      if(!groups[catKey]) groups[catKey] = [];
+      groups[catKey].push(l);
+    });
+
+    var keys = Object.keys(groups).sort(function(a,b){ return a.localeCompare(b); });
+
+    var html = "";
+    keys.forEach(function(k){
+      var items = groups[k].sort(function(a,b){ return (b.dateAdded||"").localeCompare(a.dateAdded||""); });
+      html += '<div class="subsection"><h3>'+escapeHtml(k)+' <span class="count">'+items.length+'</span></h3>';
+      html += '<div class="card-grid">';
+      items.forEach(function(l){ html += cardHtml(l, isAll); });
+      html += '</div></div>';
+    });
+
+    area.innerHTML = html;
+
+    Array.prototype.forEach.call(area.querySelectorAll('[data-edit]'), function(btn){
+      btn.addEventListener('click', function(){ openEditModal(btn.getAttribute('data-edit')); });
+    });
+    Array.prototype.forEach.call(area.querySelectorAll('[data-delete]'), function(btn){
+      btn.addEventListener('click', function(){ deleteLink(btn.getAttribute('data-delete')); });
+    });
+    Array.prototype.forEach.call(area.querySelectorAll('[data-open]'), function(btn){
+      btn.addEventListener('click', function(){ window.open(btn.getAttribute('data-open'), '_blank', 'noopener'); });
+    });
+  }
+
+  function cardHtml(l, showCategoryChip){
+    var chip = showCategoryChip ? (l.subcategory || "") : (l.subcategory || "");
+    return '<div class="card">' +
+      (chip ? '<div class="cat-chip">'+escapeHtml(chip)+'</div>' : '') +
+      '<div class="card-head">' +
+        avatarHtml(l.category) +
+        '<a class="card-title" href="'+escapeHtml(l.url)+'" target="_blank" rel="noopener noreferrer">'+escapeHtml(l.title || l.url)+'</a>' +
+      '</div>' +
+      (l.description ? '<div class="card-desc">'+escapeHtml(l.description)+'</div>' : '<div class="card-desc" style="opacity:.5;">No description</div>') +
+      '<div class="card-url"><img class="favicon" src="'+faviconUrl(l.url)+'" alt="" onerror="this.style.visibility=\'hidden\'">'+escapeHtml(l.url)+'</div>' +
+      '<div class="card-foot">' +
+        '<span class="card-date mono">'+formatDate(l.dateAdded)+'</span>' +
+        '<span class="card-actions">' +
+          '<button class="stamp-btn small teal" data-open="'+escapeHtml(l.url)+'">Open ↗</button>' +
+          '<button class="stamp-btn small" data-edit="'+l.id+'">Edit</button>' +
+          '<button class="stamp-btn small danger" data-delete="'+l.id+'">Delete</button>' +
+        '</span>' +
+      '</div>' +
+    '</div>';
+  }
+
+  function emptyStateHtml(glyph, title, body){
+    return '<div class="empty-state"><div class="glyph">'+glyph+'</div><h4>'+escapeHtml(title)+'</h4><p>'+escapeHtml(body)+'</p></div>';
+  }
+
+  // ---------- Pending review ----------
+
+  function renderPendingContent(area){
+    var items = state.data.pending.filter(matchesSearch);
+    if(!items.length){
+      area.innerHTML = emptyStateHtml("○", "No pending items", "Nothing waiting for review right now.");
+      return;
+    }
+    var html = '<div class="subsection"><h3>Awaiting Review <span class="count">'+items.length+'</span></h3></div>';
+    items.forEach(function(p){
+      html += '<div class="pending-item" data-pid="'+p.id+'">' +
+        '<div class="pending-grid">' +
+          '<div class="field full"><label>Title</label><input type="text" data-f="title" value="'+escapeHtml(p.title)+'"></div>' +
+          '<div class="field full"><label>URL</label><input type="text" data-f="url" value="'+escapeHtml(p.url)+'"></div>' +
+          '<div class="field full"><label>Description</label><textarea data-f="description">'+escapeHtml(p.description||"")+'</textarea></div>' +
+          '<div class="field"><label>Category</label><input type="text" data-f="category" list="categoryOptions" value="'+escapeHtml(p.category||"")+'"></div>' +
+          '<div class="field"><label>Subcategory</label><input type="text" data-f="subcategory" list="subcategoryOptions" value="'+escapeHtml(p.subcategory||"")+'"></div>' +
+        '</div>' +
+        '<div class="pending-foot">' +
+          '<button class="stamp-btn danger small" data-discard="'+p.id+'">Discard</button>' +
+          '<button class="stamp-btn primary small" data-approve="'+p.id+'">Approve &amp; File</button>' +
+        '</div>' +
+      '</div>';
+    });
+    area.innerHTML = html;
+
+    Array.prototype.forEach.call(area.querySelectorAll('[data-approve]'), function(btn){
+      btn.addEventListener('click', function(){ approvePending(btn.getAttribute('data-approve')); });
+    });
+    Array.prototype.forEach.call(area.querySelectorAll('[data-discard]'), function(btn){
+      btn.addEventListener('click', function(){ discardPending(btn.getAttribute('data-discard')); });
+    });
+  }
+
+  function readPendingRowFields(id){
+    var row = document.querySelector('.pending-item[data-pid="'+id+'"]');
+    if(!row) return null;
+    var out = {};
+    Array.prototype.forEach.call(row.querySelectorAll('[data-f]'), function(el){
+      out[el.getAttribute('data-f')] = el.value.trim();
+    });
+    return out;
+  }
+
+  function approvePending(id){
+    var fields = readPendingRowFields(id);
+    if(!fields || !fields.url){ showToast("A URL is required"); return; }
+    if(!fields.category){ showToast("Add a category before approving"); return; }
+    var idx = state.data.pending.findIndex(function(p){ return p.id === id; });
+    if(idx === -1) return;
+    state.data.links.push({
+      id: genId(),
+      title: fields.title || fields.url,
+      url: fields.url,
+      description: fields.description || "",
+      category: fields.category,
+      subcategory: fields.subcategory || "",
+      dateAdded: new Date().toISOString()
+    });
+    state.data.pending.splice(idx, 1);
+    saveData();
+    showToast("Filed into " + fields.category);
+    if(!state.data.pending.length) state.currentTab = TAB_ALL;
+    renderAll();
+  }
+
+  function discardPending(id){
+    var idx = state.data.pending.findIndex(function(p){ return p.id === id; });
+    if(idx === -1) return;
+    state.data.pending.splice(idx, 1);
+    saveData();
+    if(!state.data.pending.length) state.currentTab = TAB_ALL;
+    renderAll();
+  }
+
+  function deleteLink(id){
+    if(!confirm("Delete this link permanently?")) return;
+    state.data.links = state.data.links.filter(function(l){ return l.id !== id; });
+    saveData();
+    renderAll();
+  }
+
+  // ---------- Modal (add / edit) ----------
+
+  function openAddModal(){
+    state.editingId = null;
+    document.getElementById('modalTitle').textContent = "Add Link";
+    document.getElementById('fTitle').value = "";
+    document.getElementById('fUrl').value = "";
+    document.getElementById('fDesc').value = "";
+    document.getElementById('fCategory').value = (state.currentTab !== TAB_ALL && state.currentTab !== TAB_PENDING) ? state.currentTab : "";
+    document.getElementById('fSubcategory').value = "";
+    document.getElementById('deleteLinkBtn').style.display = "none";
+    document.getElementById('linkModalOverlay').classList.add('open');
+    document.getElementById('fTitle').focus();
+  }
+
+  function openEditModal(id){
+    var link = state.data.links.find(function(l){ return l.id === id; });
+    if(!link) return;
+    state.editingId = id;
+    document.getElementById('modalTitle').textContent = "Edit Link";
+    document.getElementById('fTitle').value = link.title || "";
+    document.getElementById('fUrl').value = link.url || "";
+    document.getElementById('fDesc').value = link.description || "";
+    document.getElementById('fCategory').value = link.category || "";
+    document.getElementById('fSubcategory').value = link.subcategory || "";
+    document.getElementById('deleteLinkBtn').style.display = "inline-block";
+    document.getElementById('linkModalOverlay').classList.add('open');
+    document.getElementById('fTitle').focus();
+  }
+
+  function closeModal(){
+    document.getElementById('linkModalOverlay').classList.remove('open');
+    state.editingId = null;
+  }
+
+  function saveLinkFromModal(){
+    var title = document.getElementById('fTitle').value.trim();
+    var url = document.getElementById('fUrl').value.trim();
+    var description = document.getElementById('fDesc').value.trim();
+    var category = document.getElementById('fCategory').value.trim() || "Uncategorized";
+    var subcategory = document.getElementById('fSubcategory').value.trim();
+
+    if(!url){ showToast("A URL is required"); return; }
+
+    if(state.editingId){
+      var link = state.data.links.find(function(l){ return l.id === state.editingId; });
+      if(link){
+        link.title = title || url;
+        link.url = url;
+        link.description = description;
+        link.category = category;
+        link.subcategory = subcategory;
+      }
+      showToast("Link updated");
+    } else {
+      state.data.links.push({
+        id: genId(),
+        title: title || url,
+        url: url,
+        description: description,
+        category: category,
+        subcategory: subcategory,
+        dateAdded: new Date().toISOString()
+      });
+      showToast("Link added");
+    }
+    saveData();
+    closeModal();
+    state.currentTab = category;
+    renderAll();
+  }
+
+  function deleteFromModal(){
+    if(!state.editingId) return;
+    if(!confirm("Delete this link permanently?")) return;
+    state.data.links = state.data.links.filter(function(l){ return l.id !== state.editingId; });
+    saveData();
+    closeModal();
+    renderAll();
+  }
+
+  // ---------- Bookmarks HTML import ----------
+
+  function handleBookmarksFile(file){
+    var reader = new FileReader();
+    reader.onload = function(e){
+      try{
+        var text = e.target.result;
+        var parser = new DOMParser();
+        var doc = parser.parseFromString(text, 'text/html');
+        var nodes = doc.body ? doc.body.querySelectorAll('h3, a') : [];
+        var currentFolder = "";
+        var added = 0;
+        var existingUrls = {};
+        state.data.links.forEach(function(l){ existingUrls[(l.url||"").trim()] = true; });
+        state.data.pending.forEach(function(p){ existingUrls[(p.url||"").trim()] = true; });
+
+        Array.prototype.forEach.call(nodes, function(node){
+          var tag = node.tagName;
+          if(tag === 'H3'){
+            currentFolder = node.textContent.trim();
+          } else if(tag === 'A'){
+            var href = node.getAttribute('href');
+            if(!href || existingUrls[href.trim()]) return;
+            existingUrls[href.trim()] = true;
+            state.data.pending.push({
+              id: genId(),
+              title: node.textContent.trim() || href,
+              url: href.trim(),
+              description: "",
+              category: currentFolder,
+              subcategory: "",
+              dateAdded: new Date().toISOString()
+            });
+            added++;
+          }
+        });
+
+        saveData();
+        state.currentTab = TAB_PENDING;
+        renderAll();
+        showToast(added + " bookmark" + (added===1?"":"s") + " added to Pending");
+      }catch(err){
+        console.error(err);
+        showToast("Could not parse that file");
+      }
+    };
+    reader.readAsText(file);
+  }
+
+  // ---------- Export / Import data ----------
+
+  function exportData(){
+    var payload = {
+      version: 1,
+      exportedAt: new Date().toISOString(),
+      links: state.data.links,
+      pending: state.data.pending
+    };
+    var blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    var stamp = new Date().toISOString().slice(0,10);
+    a.href = url;
+    a.download = 'ledger-export-' + stamp + '.json';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    showToast("Export downloaded");
+  }
+
+  function importDataFile(file){
+    var reader = new FileReader();
+    reader.onload = function(e){
+      try{
+        var parsed = JSON.parse(e.target.result);
+        var incomingLinks = Array.isArray(parsed.links) ? parsed.links : [];
+        var incomingPending = Array.isArray(parsed.pending) ? parsed.pending : [];
+
+        var existingUrls = {};
+        state.data.links.forEach(function(l){ existingUrls[(l.url||"").trim()] = true; });
+
+        var addedLinks = 0, skippedLinks = 0;
+        incomingLinks.forEach(function(l){
+          var url = (l.url||"").trim();
+          if(!url || existingUrls[url]){ skippedLinks++; return; }
+          existingUrls[url] = true;
+          state.data.links.push({
+            id: genId(),
+            title: l.title || url,
+            url: url,
+            description: l.description || "",
+            category: l.category || "Uncategorized",
+            subcategory: l.subcategory || "",
+            dateAdded: l.dateAdded || new Date().toISOString()
+          });
+          addedLinks++;
+        });
+
+        var existingPendingUrls = {};
+        state.data.pending.forEach(function(p){ existingPendingUrls[(p.url||"").trim()] = true; });
+        var addedPending = 0;
+        incomingPending.forEach(function(p){
+          var url = (p.url||"").trim();
+          if(!url || existingUrls[url] || existingPendingUrls[url]) return;
+          existingPendingUrls[url] = true;
+          state.data.pending.push({
+            id: genId(),
+            title: p.title || url,
+            url: url,
+            description: p.description || "",
+            category: p.category || "",
+            subcategory: p.subcategory || "",
+            dateAdded: p.dateAdded || new Date().toISOString()
+          });
+          addedPending++;
+        });
+
+        saveData();
+        renderAll();
+        showToast("Imported " + addedLinks + " link(s), " + addedPending + " pending (" + skippedLinks + " duplicate skipped)");
+      }catch(err){
+        console.error(err);
+        showToast("Could not read that file — is it a valid export?");
+      }
+    };
+    reader.readAsText(file);
+  }
+
+  // ---------- Wire up events ----------
+
+  document.getElementById('addLinkBtn').addEventListener('click', openAddModal);
+  document.getElementById('cancelModalBtn').addEventListener('click', closeModal);
+  document.getElementById('saveLinkBtn').addEventListener('click', saveLinkFromModal);
+  document.getElementById('deleteLinkBtn').addEventListener('click', deleteFromModal);
+  document.getElementById('linkModalOverlay').addEventListener('click', function(e){
+    if(e.target === this) closeModal();
+  });
+  document.addEventListener('keydown', function(e){
+    if(e.key === 'Escape') closeModal();
+  });
+
+  document.getElementById('importBookmarksBtn').addEventListener('click', function(){
+    document.getElementById('bookmarksFileInput').click();
+  });
+  document.getElementById('bookmarksFileInput').addEventListener('change', function(e){
+    if(e.target.files && e.target.files[0]) handleBookmarksFile(e.target.files[0]);
+    e.target.value = "";
+  });
+
+  document.getElementById('exportBtn').addEventListener('click', exportData);
+  document.getElementById('importDataBtn').addEventListener('click', function(){
+    document.getElementById('dataFileInput').click();
+  });
+  document.getElementById('dataFileInput').addEventListener('change', function(e){
+    if(e.target.files && e.target.files[0]) importDataFile(e.target.files[0]);
+    e.target.value = "";
+  });
+
+  document.getElementById('searchInput').addEventListener('input', function(e){
+    state.search = e.target.value;
+    renderContent();
+  });
+
+  document.getElementById('themeToggleBtn').addEventListener('click', toggleTheme);
+
+  initTheme();
+  renderAll();
+})();
+</script>
+</body>
+</html>

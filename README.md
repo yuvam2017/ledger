@@ -50,10 +50,16 @@ Click **Import Bookmarks HTML** in The Ledger and select that file. Every bookma
 ## Project structure
 
 ```
-index.html   ← the entire application (HTML, CSS, and JavaScript)
+index.html      ← the entire application (HTML, CSS, and JavaScript)
+icon-512.png    ← app icon, for repo social preview / PWA / general use
+icon-192.png    ← app icon, for home-screen / manifest icons
+icon-180.png    ← app icon, referenced as the Apple touch icon
+icon-32.png     ← small icon
+icon-16.png     ← small icon
+favicon.ico     ← classic multi-size favicon (16/32/48px)
 ```
 
-Everything lives in one file on purpose — copy it, host it, or drop it into any folder and it just works.
+`index.html` works completely on its own — its browser-tab favicon is embedded inline, so nothing breaks if you only keep that one file. The PNG/ICO files are optional extras for things like a home-screen icon or the repo's social preview image; drop them in the same folder as `index.html` if you want those to resolve.
 
 ## Browser support
 
