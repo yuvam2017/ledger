@@ -1,0 +1,719 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The Ledger — Link Archive</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    /* Light theme (default) — clean report / PDF feel */
+    --ink:#FFFFFF;
+    --ink-2:#F6F7F7;
+    --panel:#FFFFFF;
+    --card:#FFFFFF;
+    --paper:#1B1D1E;
+    --paper-dim:#666B6E;
+    --gold:#1F6F5C;
+    --gold-dim:#BFE0D6;
+    --teal:#1F6F5C;
+    --rule:#DEE2E1;
+    --rule-soft:#EDF0EF;
+    --danger:#B3261E;
+    --danger-dim:#F0C6C3;
+    --on-accent:#FFFFFF;
+    --shadow: 0 12px 26px -14px rgba(20,30,28,0.18);
+    --grad-1: transparent;
+    --grad-2: transparent;
+    color-scheme: light;
+  }
+  html[data-theme="dark"]{
+    --ink:#10151B;
+    --ink-2:#161D25;
+    --panel:#1B232C;
+    --card:#1F2932;
+    --paper:#EAE4D2;
+    --paper-dim:#9C9880;
+    --gold:#C9A15A;
+    --gold-dim:#8E7642;
+    --teal:#5FA8A0;
+    --rule:#2C3742;
+    --rule-soft:#232C35;
+    --danger:#C0655D;
+    --danger-dim:#7A423D;
+    --on-accent:#10151B;
+    --shadow: 0 12px 30px -12px rgba(0,0,0,0.6);
+    --grad-1: rgba(201,161,90,0.06);
+    --grad-2: rgba(95,168,160,0.06);
+    color-scheme: dark;
+  }
+  *{ box-sizing:border-box; }
+  html,body{ margin:0; padding:0; }
+  body{
+    background:
+      radial-gradient(1200px 600px at 15% -10%, var(--grad-1), transparent 60%),
+      radial-gradient(1000px 500px at 100% 0%, var(--grad-2), transparent 55%),
+      var(--ink);
+    color:var(--paper);
+    font-family:'Inter', system-ui, -apple-system, Arial, sans-serif;
+    min-height:100vh;
+    -webkit-font-smoothing:antialiased;
+    transition:background-color .2s ease, color .2s ease;
+  }
+  ::selection{ background:var(--gold-dim); color:var(--paper); }
+
+  .mono{ font-family:'IBM Plex Mono', monospace; }
+
+  a{ color:var(--teal); }
+
+  /* ---------- Header ---------- */
+  header.top{
+    padding:34px 28px 18px;
+    max-width:1180px;
+    margin:0 auto;
+  }
+  .brand-row{
+    display:flex;
+    align-items:baseline;
+    justify-content:space-between;
+    gap:16px;
+    flex-wrap:wrap;
+    border-bottom:1px solid var(--rule);
+    padding-bottom:18px;
+  }
+  .brand{
+    font-family:'Inter', system-ui, sans-serif;
+    font-weight:800;
+    font-size:2rem;
+    letter-spacing:-0.3px;
+    color:var(--paper);
+    display:flex;
+    align-items:baseline;
+    gap:10px;
+  }
+  .brand .dot{ color:var(--gold); }
+  .brand-sub{
+    font-family:'IBM Plex Mono', monospace;
+    font-size:0.68rem;
+    letter-spacing:2.5px;
+    text-transform:uppercase;
+    color:var(--paper-dim);
+  }
+  .stat-line{
+    font-family:'IBM Plex Mono', monospace;
+    font-size:0.72rem;
+    color:var(--paper-dim);
+    letter-spacing:0.5px;
+  }
+
+  .toolbar{
+    display:flex;
+    gap:10px;
+    flex-wrap:wrap;
+    align-items:center;
+    margin-top:18px;
+  }
+  .search-wrap{
+    flex:1 1 220px;
+    position:relative;
+  }
+  .search-wrap input{
+    width:100%;
+    background:var(--panel);
+    border:1px solid var(--rule);
+    color:var(--paper);
+    padding:10px 14px 10px 30px;
+    border-radius:3px;
+    font-family:'IBM Plex Mono', monospace;
+    font-size:0.82rem;
+    outline:none;
+  }
+  .search-wrap input:focus{ border-color:var(--gold-dim); }
+  .search-wrap::before{
+    content:"⌕";
+    position:absolute;
+    left:11px; top:50%;
+    transform:translateY(-50%);
+    color:var(--paper-dim);
+    font-size:1rem;
+  }
+  .search-wrap input::placeholder{ color:var(--paper-dim); }
+
+  .stamp-btn{
+    font-family:'IBM Plex Mono', monospace;
+    font-size:0.7rem;
+    letter-spacing:1.6px;
+    text-transform:uppercase;
+    background:transparent;
+    color:var(--paper);
+    border:1px solid var(--rule);
+    padding:10px 14px;
+    border-radius:3px;
+    cursor:pointer;
+    white-space:nowrap;
+    transition:border-color .15s ease, color .15s ease, background .15s ease;
+  }
+  .stamp-btn:hover{ border-color:var(--gold); color:var(--gold); }
+  .stamp-btn.primary{
+    background:var(--gold);
+    border-color:var(--gold);
+    color:var(--on-accent);
+    font-weight:600;
+  }
+  .stamp-btn.primary:hover{ filter:brightness(1.08); }
+  .stamp-btn.ghost{ opacity:0.85; }
+  .stamp-btn.small{ padding:6px 10px; font-size:0.62rem; }
+  .stamp-btn.danger{ border-color:var(--danger-dim); color:var(--danger); }
+  .stamp-btn.danger:hover{ background:var(--danger); color:var(--on-accent); border-color:var(--danger); }
+  .stamp-btn.teal{ border-color:var(--teal); color:var(--teal); }
+  .stamp-btn.teal:hover{ background:var(--teal); color:var(--on-accent); }
+  .theme-toggle{
+    display:inline-flex;
+    align-items:center;
+    gap:6px;
+  }
+
+  input[type=file]{ display:none; }
+
+  /* ---------- Tabs (folder-tab motif) ---------- */
+  .tabs-bar{
+    max-width:1180px;
+    margin:0 auto;
+    padding:0 28px;
+    display:flex;
+    gap:4px;
+    flex-wrap:wrap;
+    align-items:flex-end;
+    margin-top:26px;
+  }
+  .tab{
+    font-family:'IBM Plex Mono', monospace;
+    font-size:0.72rem;
+    letter-spacing:1.2px;
+    text-transform:uppercase;
+    color:var(--paper-dim);
+    background:var(--ink-2);
+    border:1px solid var(--rule);
+    border-bottom:none;
+    padding:10px 18px 9px;
+    cursor:pointer;
+    clip-path:polygon(10px 0, 100% 0, calc(100% - 10px) 100%, 0 100%);
+    margin-bottom:-1px;
+    transition:color .15s ease, background .15s ease;
+    display:flex;
+    align-items:center;
+    gap:6px;
+  }
+  .tab:hover{ color:var(--paper); }
+  .tab.active{
+    background:var(--gold);
+    color:var(--on-accent);
+    border-color:var(--gold);
+    position:relative;
+    z-index:2;
+  }
+  .tab.pending-tab{ border-style:dashed; }
+  .tab.pending-tab.active{ background:var(--danger); border-color:var(--danger); color:var(--on-accent); }
+  .tab .badge{
+    background:var(--gold);
+    color:var(--on-accent);
+    border-radius:20px;
+    padding:1px 7px;
+    font-size:0.62rem;
+  }
+  .tab.active .badge{ background:rgba(255,255,255,0.28); }
+  .tab .cat-avatar{
+    width:19px; height:19px;
+    font-size:0.62rem;
+  }
+  .tab .cat-avatar.all-avatar{ background:var(--paper-dim); }
+  .tab .cat-avatar.pending-avatar{ background:var(--danger); }
+  .tab.pending-tab .badge{ background:var(--danger); }
+
+  /* ---------- Content Panel ---------- */
+  .panel{
+    max-width:1180px;
+    margin:0 auto 80px;
+    padding:32px 28px 40px;
+    background:var(--panel);
+    border:1px solid var(--rule);
+    border-radius:0 4px 4px 4px;
+    min-height:300px;
+  }
+
+  .subsection{ margin-bottom:36px; }
+  .subsection:last-child{ margin-bottom:0; }
+  .subsection h3{
+    font-family:'Inter', system-ui, sans-serif;
+    font-weight:500;
+    font-size:1.05rem;
+    color:var(--teal);
+    margin:0 0 4px;
+    display:flex;
+    align-items:center;
+    gap:10px;
+  }
+  .subsection h3::after{
+    content:"";
+    flex:1;
+    height:1px;
+    background:var(--rule-soft);
+  }
+  .subsection .count{
+    font-family:'IBM Plex Mono', monospace;
+    font-size:0.65rem;
+    color:var(--paper-dim);
+  }
+
+  .card-grid{
+    display:grid;
+    grid-template-columns:repeat(auto-fill, minmax(255px, 1fr));
+    gap:14px;
+    margin-top:16px;
+  }
+
+  .card{
+    background:var(--card);
+    border:1px solid var(--rule);
+    border-top:2px solid var(--gold-dim);
+    border-radius:2px;
+    padding:16px 16px 12px;
+    position:relative;
+    display:flex;
+    flex-direction:column;
+    min-height:130px;
+    transition:border-color .15s ease, transform .15s ease;
+  }
+  .card:hover{ border-color:var(--gold); transform:translateY(-1px); }
+  .card .cat-chip{
+    position:absolute;
+    top:-9px; right:12px;
+    background:var(--ink-2);
+    border:1px solid var(--rule);
+    color:var(--paper-dim);
+    font-family:'IBM Plex Mono', monospace;
+    font-size:0.58rem;
+    letter-spacing:1px;
+    text-transform:uppercase;
+    padding:2px 8px;
+    border-radius:20px;
+  }
+  .cat-avatar{
+    flex-shrink:0;
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    width:32px; height:32px;
+    border-radius:50%;
+    color:#FFFFFF;
+    font-family:'Inter', system-ui, sans-serif;
+    font-weight:700;
+    font-size:0.9rem;
+    line-height:1;
+  }
+  .card-head{
+    display:flex;
+    align-items:flex-start;
+    gap:10px;
+    margin-top:4px;
+  }
+  .card a.card-title{
+    font-family:'Inter', system-ui, sans-serif;
+    font-weight:600;
+    font-size:1.05rem;
+    color:var(--paper);
+    text-decoration:none;
+    line-height:1.3;
+    display:block;
+    padding-top:4px;
+  }
+  .card a.card-title:hover{ color:var(--gold); }
+  .card .card-desc{
+    font-size:0.86rem;
+    color:var(--paper-dim);
+    line-height:1.5;
+    margin-top:8px;
+    flex:1;
+    display:-webkit-box;
+    -webkit-line-clamp:3;
+    -webkit-box-orient:vertical;
+    overflow:hidden;
+  }
+  .card .card-url{
+    font-family:'IBM Plex Mono', monospace;
+    font-size:0.66rem;
+    color:var(--teal);
+    opacity:0.85;
+    margin-top:10px;
+    overflow:hidden;
+    text-overflow:ellipsis;
+    white-space:nowrap;
+    display:flex;
+    align-items:center;
+    gap:6px;
+  }
+  .card .card-url img.favicon{
+    width:14px; height:14px;
+    border-radius:3px;
+    flex-shrink:0;
+  }
+  .card .card-foot{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    margin-top:12px;
+    padding-top:10px;
+    border-top:1px dashed var(--rule-soft);
+    flex-wrap:wrap;
+    gap:8px;
+  }
+  .card .card-date{
+    font-family:'IBM Plex Mono', monospace;
+    font-size:0.6rem;
+    color:var(--paper-dim);
+  }
+  .card .card-actions{ display:flex; gap:6px; flex-wrap:wrap; justify-content:flex-end; }
+
+  .empty-state{
+    text-align:center;
+    padding:60px 20px;
+    color:var(--paper-dim);
+  }
+  .empty-state .glyph{ font-size:2rem; color:var(--gold-dim); margin-bottom:10px; }
+  .empty-state h4{
+    font-family:'Inter', system-ui, sans-serif;
+    color:var(--paper);
+    font-weight:500;
+    font-size:1.3rem;
+    margin:0 0 8px;
+  }
+  .empty-state p{ font-size:0.9rem; max-width:420px; margin:0 auto; }
+
+  /* ---------- Pending list ---------- */
+  .pending-item{
+    background:var(--card);
+    border:1px solid var(--rule);
+    border-left:3px solid var(--danger);
+    border-radius:2px;
+    padding:16px;
+    margin-bottom:14px;
+  }
+  .pending-grid{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:10px;
+  }
+  .pending-grid .full{ grid-column:1 / -1; }
+  .field label{
+    display:block;
+    font-family:'IBM Plex Mono', monospace;
+    font-size:0.6rem;
+    letter-spacing:1px;
+    text-transform:uppercase;
+    color:var(--paper-dim);
+    margin-bottom:4px;
+  }
+  .field input, .field textarea{
+    width:100%;
+    background:var(--ink-2);
+    border:1px solid var(--rule);
+    color:var(--paper);
+    padding:8px 10px;
+    border-radius:3px;
+    font-family:'Inter', system-ui, sans-serif;
+    font-size:0.88rem;
+    outline:none;
+  }
+  .field input:focus, .field textarea:focus{ border-color:var(--gold-dim); }
+  .field textarea{ resize:vertical; min-height:44px; font-family:'Inter', system-ui, sans-serif; }
+  .pending-foot{
+    display:flex;
+    justify-content:flex-end;
+    gap:8px;
+    margin-top:12px;
+  }
+
+  @media (max-width:640px){
+    .pending-grid{ grid-template-columns:1fr; }
+  }
+
+  /* ---------- Modal ---------- */
+  .modal-overlay{
+    display:none;
+    position:fixed; inset:0;
+    background:rgba(8,11,14,0.72);
+    z-index:50;
+    align-items:flex-start;
+    justify-content:center;
+    padding:60px 16px;
+    overflow-y:auto;
+  }
+  .modal-overlay.open{ display:flex; }
+  .modal{
+    background:var(--panel);
+    border:1px solid var(--rule);
+    border-top:3px solid var(--gold);
+    border-radius:2px;
+    width:100%;
+    max-width:520px;
+    padding:26px 26px 22px;
+    box-shadow:var(--shadow);
+  }
+  .modal h2{
+    font-family:'Inter', system-ui, sans-serif;
+    font-weight:600;
+    font-size:1.4rem;
+    margin:0 0 18px;
+    color:var(--paper);
+  }
+  .modal .field{ margin-bottom:14px; }
+  .modal-foot{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    margin-top:20px;
+    padding-top:16px;
+    border-top:1px solid var(--rule-soft);
+  }
+  .modal-foot .right{ display:flex; gap:8px; }
+
+  footer.foot{
+    text-align:center;
+    color:var(--paper-dim);
+    font-family:'IBM Plex Mono', monospace;
+    font-size:0.65rem;
+    letter-spacing:1px;
+    padding:0 20px 40px;
+  }
+
+  .toast{
+    position:fixed;
+    bottom:24px; left:50%;
+    transform:translateX(-50%) translateY(20px);
+    background:var(--gold);
+    color:var(--on-accent);
+    font-family:'IBM Plex Mono', monospace;
+    font-size:0.75rem;
+    letter-spacing:0.5px;
+    padding:10px 18px;
+    border-radius:3px;
+    box-shadow:var(--shadow);
+    opacity:0;
+    pointer-events:none;
+    transition:opacity .2s ease, transform .2s ease;
+    z-index:100;
+  }
+  .toast.show{ opacity:1; transform:translateX(-50%) translateY(0); }
+
+  @media (max-width:640px){
+    header.top{ padding:24px 16px 14px; }
+    .tabs-bar{ padding:0 16px; }
+    .panel{ padding:22px 16px 30px; margin:0 12px 60px; }
+    .brand{ font-size:1.6rem; }
+  }
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="brand-row">
+    <div>
+      <div class="brand"><span class="dot">◆</span>The Ledger</div>
+      <div class="brand-sub">a private catalog of links</div>
+    </div>
+    <div class="stat-line" id="statLine">0 links across 0 categories</div>
+  </div>
+
+  <div class="toolbar">
+    <div class="search-wrap">
+      <input type="text" id="searchInput" placeholder="search titles, descriptions, urls…">
+    </div>
+    <button class="stamp-btn primary" id="addLinkBtn">＋ Add Link</button>
+    <button class="stamp-btn teal" id="importBookmarksBtn">Import Bookmarks HTML</button>
+    <button class="stamp-btn ghost" id="exportBtn">Export Data</button>
+    <button class="stamp-btn ghost" id="importDataBtn">Import Data</button>
+    <button class="stamp-btn ghost theme-toggle" id="themeToggleBtn"><span id="themeIcon">☾</span> <span id="themeLabel">Dark</span></button>
+    <input type="file" id="bookmarksFileInput" accept=".html,.htm">
+    <input type="file" id="dataFileInput" accept=".json">
+  </div>
+</header>
+
+<nav class="tabs-bar" id="tabsBar"></nav>
+<main class="panel" id="contentArea"></main>
+
+<footer class="foot">STORED LOCALLY IN THIS BROWSER · USE EXPORT / IMPORT TO MOVE BETWEEN DEVICES</footer>
+
+<!-- Add / Edit Link Modal -->
+<div class="modal-overlay" id="linkModalOverlay">
+  <div class="modal">
+    <h2 id="modalTitle">Add Link</h2>
+    <div class="field">
+      <label>Title</label>
+      <input type="text" id="fTitle" placeholder="e.g. Revision Polity — Session 4">
+    </div>
+    <div class="field">
+      <label>URL</label>
+      <input type="text" id="fUrl" placeholder="https://…">
+    </div>
+    <div class="field">
+      <label>Description</label>
+      <textarea id="fDesc" placeholder="What is this link, why it's saved…"></textarea>
+    </div>
+    <div class="field">
+      <label>Category</label>
+      <input type="text" id="fCategory" list="categoryOptions" placeholder="e.g. Polity, Governance & IR">
+      <datalist id="categoryOptions"></datalist>
+    </div>
+    <div class="field">
+      <label>Subcategory</label>
+      <input type="text" id="fSubcategory" list="subcategoryOptions" placeholder="e.g. Revision Sessions">
+      <datalist id="subcategoryOptions"></datalist>
+    </div>
+    <div class="modal-foot">
+      <button class="stamp-btn danger" id="deleteLinkBtn" style="display:none;">Delete</button>
+      <div class="right">
+        <button class="stamp-btn ghost" id="cancelModalBtn">Cancel</button>
+        <button class="stamp-btn primary" id="saveLinkBtn">Save</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+(function(){
+  "use strict";
+
+  var STORAGE_KEY = "ledgerArchiveData_v1";
+  var THEME_KEY = "ledgerTheme_v1";
+  var TAB_ALL = "__all__";
+  var TAB_PENDING = "__pending__";
+
+  function applyTheme(theme){
+    document.documentElement.setAttribute('data-theme', theme);
+    var icon = document.getElementById('themeIcon');
+    var label = document.getElementById('themeLabel');
+    if(theme === 'dark'){
+      icon.textContent = '☀';
+      label.textContent = 'Light';
+    } else {
+      icon.textContent = '☾';
+      label.textContent = 'Dark';
+    }
+    localStorage.setItem(THEME_KEY, theme);
+  }
+
+  function initTheme(){
+    var saved = localStorage.getItem(THEME_KEY);
+    applyTheme(saved === 'dark' ? 'dark' : 'light');
+  }
+
+  function toggleTheme(){
+    var current = document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light';
+    applyTheme(current === 'dark' ? 'light' : 'dark');
+  }
+
+  var state = {
+    data: loadData(),
+    currentTab: TAB_ALL,
+    search: "",
+    editingId: null
+  };
+
+  function loadData(){
+    try{
+      var raw = localStorage.getItem(STORAGE_KEY);
+      if(!raw) return { links: [], pending: [] };
+      var parsed = JSON.parse(raw);
+      return {
+        links: Array.isArray(parsed.links) ? parsed.links : [],
+        pending: Array.isArray(parsed.pending) ? parsed.pending : []
+      };
+    }catch(e){
+      console.error("Failed to load data", e);
+      return { links: [], pending: [] };
+    }
+  }
+
+  function saveData(){
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state.data));
+  }
+
+  function genId(){
+    return 'l_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2,8);
+  }
+
+  function escapeHtml(str){
+    return (str || "").replace(/[&<>"']/g, function(c){
+      return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];
+    });
+  }
+
+  var AVATAR_PALETTE = ['#1F6F5C','#2F6690','#8E5B3F','#6B4E9E','#B0563D','#3F7D5C','#7A4A6B','#4A6FA5','#9B6B2F','#557153','#3D6B7D','#8A4B62'];
+
+  function avatarColor(label){
+    var s = label || '?';
+    var sum = 0;
+    for(var i=0;i<s.length;i++) sum += s.charCodeAt(i);
+    return AVATAR_PALETTE[sum % AVATAR_PALETTE.length];
+  }
+
+  function avatarHtml(label, extraClass){
+    var letter = (label || '?').trim().charAt(0).toUpperCase() || '?';
+    var color = avatarColor(label);
+    return '<span class="cat-avatar'+(extraClass ? ' '+extraClass : '')+'" style="background:'+color+'" title="'+escapeHtml(label||'')+'">'+escapeHtml(letter)+'</span>';
+  }
+
+  function faviconUrl(url){
+    try{
+      return 'https://www.google.com/s2/favicons?sz=64&domain_url=' + encodeURIComponent(url);
+    }catch(e){ return ''; }
+  }
+
+  function formatDate(iso){
+    try{
+      var d = new Date(iso);
+      return d.toLocaleDateString(undefined, { year:'numeric', month:'short', day:'numeric' });
+    }catch(e){ return ""; }
+  }
+
+  function showToast(msg){
+    var t = document.getElementById('toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    clearTimeout(t._timer);
+    t._timer = setTimeout(function(){ t.classList.remove('show'); }, 2200);
+  }
+
+  function getCategories(){
+    var set = {};
+    state.data.links.forEach(function(l){ if(l.category) set[l.category] = true; });
+    return Object.keys(set).sort(function(a,b){ return a.localeCompare(b); });
+  }
+
+  function getSubcategories(category){
+    var set = {};
+    state.data.links.forEach(function(l){
+      if(l.subcategory && (!category || l.category === category)) set[l.subcategory] = true;
+    });
+    return Object.keys(set).sort(function(a,b){ return a.localeCompare(b); });
+  }
+
+  // ---------- Rendering ----------
+
+  function renderAll(){
+    renderStatLine();
+    renderTabs();
+    renderContent();
+    renderDatalists();
+  }
+
+  function renderStatLine(){
+    var cats = getCategories();
+    var pendingCount = state.data.pending.length;
+    var line = state.data.links.length + " link" + (state.data.links.length===1?"":"s") +
+      " across " + cats.length + " categor" + (cats.length===1?"y":"ies");
+    if(pendingCount) line += "  ·  " + pendingCount + " pending review
