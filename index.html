@@ -333,6 +333,21 @@
     padding-top:4px;
   }
   .card a.card-title:hover{ color:var(--gold); }
+  .date-pill{
+    display:inline-flex;
+    align-items:center;
+    gap:5px;
+    font-family:'IBM Plex Mono', monospace;
+    font-size:0.62rem;
+    letter-spacing:0.5px;
+    color:var(--gold);
+    background:var(--rule-soft);
+    border:1px solid var(--rule);
+    padding:3px 9px;
+    border-radius:20px;
+    margin-top:10px;
+    width:fit-content;
+  }
   .card .card-desc{
     font-size:0.86rem;
     color:var(--paper-dim);
@@ -364,18 +379,13 @@
   }
   .card .card-foot{
     display:flex;
-    justify-content:space-between;
+    justify-content:flex-end;
     align-items:center;
     margin-top:12px;
     padding-top:10px;
     border-top:1px dashed var(--rule-soft);
     flex-wrap:wrap;
     gap:8px;
-  }
-  .card .card-date{
-    font-family:'IBM Plex Mono', monospace;
-    font-size:0.6rem;
-    color:var(--paper-dim);
   }
   .card .card-actions{ display:flex; gap:6px; flex-wrap:wrap; justify-content:flex-end; }
 
@@ -418,7 +428,7 @@
     color:var(--paper-dim);
     margin-bottom:4px;
   }
-  .field input, .field textarea{
+  .field input, .field textarea, .field select{
     width:100%;
     background:var(--ink-2);
     border:1px solid var(--rule);
@@ -429,8 +439,9 @@
     font-size:0.88rem;
     outline:none;
   }
-  .field input:focus, .field textarea:focus{ border-color:var(--gold-dim); }
+  .field input:focus, .field textarea:focus, .field select:focus{ border-color:var(--gold-dim); }
   .field textarea{ resize:vertical; min-height:44px; font-family:'Inter', system-ui, sans-serif; }
+  .field select{ cursor:pointer; }
   .pending-foot{
     display:flex;
     justify-content:flex-end;
@@ -534,6 +545,7 @@
       <input type="text" id="searchInput" placeholder="search titles, descriptions, urls…">
     </div>
     <button class="stamp-btn primary" id="addLinkBtn">＋ Add Link</button>
+    <button class="stamp-btn ghost theme-toggle" id="sortToggleBtn"><span id="sortIcon">↓</span> <span id="sortLabel">Newest First</span></button>
     <button class="stamp-btn teal" id="importBookmarksBtn">Import Bookmarks HTML</button>
     <button class="stamp-btn ghost" id="exportBtn">Export Data</button>
     <button class="stamp-btn ghost" id="importDataBtn">Import Data</button>
@@ -565,14 +577,18 @@
       <textarea id="fDesc" placeholder="What is this link, why it's saved…"></textarea>
     </div>
     <div class="field">
+      <label>Date</label>
+      <input type="date" id="fEventDate">
+    </div>
+    <div class="field">
       <label>Category</label>
-      <input type="text" id="fCategory" list="categoryOptions" placeholder="e.g. Polity, Governance & IR">
-      <datalist id="categoryOptions"></datalist>
+      <select id="fCategorySelect"></select>
+      <input type="text" id="fCategoryNew" placeholder="Type new category name" style="display:none; margin-top:8px;">
     </div>
     <div class="field">
       <label>Subcategory</label>
-      <input type="text" id="fSubcategory" list="subcategoryOptions" placeholder="e.g. Revision Sessions">
-      <datalist id="subcategoryOptions"></datalist>
+      <select id="fSubcategorySelect"></select>
+      <input type="text" id="fSubcategoryNew" placeholder="Type new subcategory name" style="display:none; margin-top:8px;">
     </div>
     <div class="modal-foot">
       <button class="stamp-btn danger" id="deleteLinkBtn" style="display:none;">Delete</button>
@@ -585,6 +601,8 @@
 </div>
 
 <div class="toast" id="toast"></div>
+<datalist id="categoryOptions"></datalist>
+<datalist id="subcategoryOptions"></datalist>
 
 <script>
 (function(){
@@ -592,8 +610,10 @@
 
   var STORAGE_KEY = "ledgerArchiveData_v1";
   var THEME_KEY = "ledgerTheme_v1";
+  var SORT_KEY = "ledgerSortOrder_v1";
   var TAB_ALL = "__all__";
   var TAB_PENDING = "__pending__";
+  var NEW_OPTION = "__new__";
 
   function applyTheme(theme){
     document.documentElement.setAttribute('data-theme', theme);
@@ -619,11 +639,60 @@
     applyTheme(current === 'dark' ? 'light' : 'dark');
   }
 
+  function updateSortButton(){
+    var icon = document.getElementById('sortIcon');
+    var label = document.getElementById('sortLabel');
+    if(state.sortOrder === 'asc'){
+      icon.textContent = '↑';
+      label.textContent = 'Oldest First';
+    } else {
+      icon.textContent = '↓';
+      label.textContent = 'Newest First';
+    }
+  }
+
+  function initSort(){
+    var saved = localStorage.getItem(SORT_KEY);
+    state.sortOrder = saved === 'asc' ? 'asc' : 'desc';
+    updateSortButton();
+  }
+
+  function toggleSort(){
+    state.sortOrder = state.sortOrder === 'desc' ? 'asc' : 'desc';
+    localStorage.setItem(SORT_KEY, state.sortOrder);
+    updateSortButton();
+    renderContent();
+  }
+
+  function compareByDate(a, b){
+    var da = a.eventDate || (a.dateAdded || "").slice(0, 10) || "0000-00-00";
+    var db = b.eventDate || (b.dateAdded || "").slice(0, 10) || "0000-00-00";
+    if(state.sortOrder === 'asc') return da.localeCompare(db);
+    return db.localeCompare(da);
+  }
+
+  function todayStr(){
+    var d = new Date();
+    var m = String(d.getMonth()+1).padStart(2,'0');
+    var day = String(d.getDate()).padStart(2,'0');
+    return d.getFullYear() + '-' + m + '-' + day;
+  }
+
+  function formatEventDate(dateStr){
+    if(!dateStr) return '';
+    var parts = dateStr.split('-');
+    if(parts.length !== 3) return dateStr;
+    var d = new Date(parseInt(parts[0],10), parseInt(parts[1],10)-1, parseInt(parts[2],10));
+    if(isNaN(d.getTime())) return dateStr;
+    return d.toLocaleDateString(undefined, { year:'numeric', month:'short', day:'numeric' });
+  }
+
   var state = {
     data: loadData(),
     currentTab: TAB_ALL,
     search: "",
-    editingId: null
+    editingId: null,
+    sortOrder: "desc"
   };
 
   function loadData(){
@@ -700,7 +769,7 @@
   function getSubcategories(category){
     var set = {};
     state.data.links.forEach(function(l){
-      if(l.subcategory && (!category || l.category === category)) set[l.subcategory] = true;
+      if(l.subcategory && (category === null || l.category === category)) set[l.subcategory] = true;
     });
     return Object.keys(set).sort(function(a,b){ return a.localeCompare(b); });
   }
@@ -824,7 +893,7 @@
 
     var html = "";
     keys.forEach(function(k){
-      var items = groups[k].sort(function(a,b){ return (b.dateAdded||"").localeCompare(a.dateAdded||""); });
+      var items = groups[k].sort(compareByDate);
       html += '<div class="subsection"><h3>'+escapeHtml(k)+' <span class="count">'+items.length+'</span></h3>';
       html += '<div class="card-grid">';
       items.forEach(function(l){ html += cardHtml(l, isAll); });
@@ -846,16 +915,17 @@
 
   function cardHtml(l, showCategoryChip){
     var chip = showCategoryChip ? (l.subcategory || "") : (l.subcategory || "");
+    var evDate = l.eventDate || (l.dateAdded || "").slice(0,10);
     return '<div class="card">' +
       (chip ? '<div class="cat-chip">'+escapeHtml(chip)+'</div>' : '') +
       '<div class="card-head">' +
         avatarHtml(l.category) +
         '<a class="card-title" href="'+escapeHtml(l.url)+'" target="_blank" rel="noopener noreferrer">'+escapeHtml(l.title || l.url)+'</a>' +
       '</div>' +
+      (evDate ? '<div class="date-pill">'+escapeHtml(formatEventDate(evDate))+'</div>' : '') +
       (l.description ? '<div class="card-desc">'+escapeHtml(l.description)+'</div>' : '<div class="card-desc" style="opacity:.5;">No description</div>') +
       '<div class="card-url"><img class="favicon" src="'+faviconUrl(l.url)+'" alt="" onerror="this.style.visibility=\'hidden\'">'+escapeHtml(l.url)+'</div>' +
       '<div class="card-foot">' +
-        '<span class="card-date mono">'+formatDate(l.dateAdded)+'</span>' +
         '<span class="card-actions">' +
           '<button class="stamp-btn small teal" data-open="'+escapeHtml(l.url)+'">Open ↗</button>' +
           '<button class="stamp-btn small" data-edit="'+l.id+'">Edit</button>' +
@@ -884,6 +954,7 @@
           '<div class="field full"><label>Title</label><input type="text" data-f="title" value="'+escapeHtml(p.title)+'"></div>' +
           '<div class="field full"><label>URL</label><input type="text" data-f="url" value="'+escapeHtml(p.url)+'"></div>' +
           '<div class="field full"><label>Description</label><textarea data-f="description">'+escapeHtml(p.description||"")+'</textarea></div>' +
+          '<div class="field"><label>Date</label><input type="date" data-f="eventDate" value="'+escapeHtml(p.eventDate || todayStr())+'"></div>' +
           '<div class="field"><label>Category</label><input type="text" data-f="category" list="categoryOptions" value="'+escapeHtml(p.category||"")+'"></div>' +
           '<div class="field"><label>Subcategory</label><input type="text" data-f="subcategory" list="subcategoryOptions" value="'+escapeHtml(p.subcategory||"")+'"></div>' +
         '</div>' +
@@ -926,6 +997,7 @@
       description: fields.description || "",
       category: fields.category,
       subcategory: fields.subcategory || "",
+      eventDate: fields.eventDate || todayStr(),
       dateAdded: new Date().toISOString()
     });
     state.data.pending.splice(idx, 1);
@@ -953,14 +1025,107 @@
 
   // ---------- Modal (add / edit) ----------
 
+  function populateCategorySelect(selected){
+    var sel = document.getElementById('fCategorySelect');
+    var newInput = document.getElementById('fCategoryNew');
+    var cats = getCategories();
+    var html = "";
+    cats.forEach(function(c){ html += '<option value="'+escapeHtml(c)+'">'+escapeHtml(c)+'</option>'; });
+    html += '<option value="'+NEW_OPTION+'">+ Add new category</option>';
+    sel.innerHTML = html;
+
+    if(selected && cats.indexOf(selected) > -1){
+      sel.value = selected;
+      newInput.style.display = "none";
+      newInput.value = "";
+    } else if(selected){
+      sel.value = NEW_OPTION;
+      newInput.value = selected;
+      newInput.style.display = "block";
+    } else if(cats.length){
+      sel.value = cats[0];
+      newInput.style.display = "none";
+      newInput.value = "";
+    } else {
+      sel.value = NEW_OPTION;
+      newInput.style.display = "block";
+      newInput.value = "";
+    }
+  }
+
+  function currentCategoryValue(){
+    var sel = document.getElementById('fCategorySelect');
+    if(sel.value === NEW_OPTION) return document.getElementById('fCategoryNew').value.trim();
+    return sel.value;
+  }
+
+  function populateSubcategorySelect(category, selected){
+    var sel = document.getElementById('fSubcategorySelect');
+    var newInput = document.getElementById('fSubcategoryNew');
+    var subs = getSubcategories(category);
+    var html = '<option value="">— none —</option>';
+    subs.forEach(function(s){ html += '<option value="'+escapeHtml(s)+'">'+escapeHtml(s)+'</option>'; });
+    html += '<option value="'+NEW_OPTION+'">+ Add new subcategory</option>';
+    sel.innerHTML = html;
+
+    if(selected && subs.indexOf(selected) > -1){
+      sel.value = selected;
+      newInput.style.display = "none";
+      newInput.value = "";
+    } else if(selected){
+      sel.value = NEW_OPTION;
+      newInput.value = selected;
+      newInput.style.display = "block";
+    } else {
+      sel.value = "";
+      newInput.style.display = "none";
+      newInput.value = "";
+    }
+  }
+
+  function currentSubcategoryValue(){
+    var sel = document.getElementById('fSubcategorySelect');
+    if(sel.value === NEW_OPTION) return document.getElementById('fSubcategoryNew').value.trim();
+    return sel.value;
+  }
+
+  function handleCategorySelectChange(){
+    var sel = document.getElementById('fCategorySelect');
+    var newInput = document.getElementById('fCategoryNew');
+    if(sel.value === NEW_OPTION){
+      newInput.style.display = "block";
+      newInput.value = "";
+      newInput.focus();
+    } else {
+      newInput.style.display = "none";
+      newInput.value = "";
+    }
+    populateSubcategorySelect(currentCategoryValue(), null);
+  }
+
+  function handleSubcategorySelectChange(){
+    var sel = document.getElementById('fSubcategorySelect');
+    var newInput = document.getElementById('fSubcategoryNew');
+    if(sel.value === NEW_OPTION){
+      newInput.style.display = "block";
+      newInput.value = "";
+      newInput.focus();
+    } else {
+      newInput.style.display = "none";
+      newInput.value = "";
+    }
+  }
+
   function openAddModal(){
     state.editingId = null;
     document.getElementById('modalTitle').textContent = "Add Link";
     document.getElementById('fTitle').value = "";
     document.getElementById('fUrl').value = "";
     document.getElementById('fDesc').value = "";
-    document.getElementById('fCategory').value = (state.currentTab !== TAB_ALL && state.currentTab !== TAB_PENDING) ? state.currentTab : "";
-    document.getElementById('fSubcategory').value = "";
+    document.getElementById('fEventDate').value = todayStr();
+    var presetCategory = (state.currentTab !== TAB_ALL && state.currentTab !== TAB_PENDING) ? state.currentTab : null;
+    populateCategorySelect(presetCategory);
+    populateSubcategorySelect(currentCategoryValue(), null);
     document.getElementById('deleteLinkBtn').style.display = "none";
     document.getElementById('linkModalOverlay').classList.add('open');
     document.getElementById('fTitle').focus();
@@ -974,8 +1139,9 @@
     document.getElementById('fTitle').value = link.title || "";
     document.getElementById('fUrl').value = link.url || "";
     document.getElementById('fDesc').value = link.description || "";
-    document.getElementById('fCategory').value = link.category || "";
-    document.getElementById('fSubcategory').value = link.subcategory || "";
+    document.getElementById('fEventDate').value = link.eventDate || (link.dateAdded || "").slice(0,10) || todayStr();
+    populateCategorySelect(link.category || null);
+    populateSubcategorySelect(currentCategoryValue(), link.subcategory || null);
     document.getElementById('deleteLinkBtn').style.display = "inline-block";
     document.getElementById('linkModalOverlay').classList.add('open');
     document.getElementById('fTitle').focus();
@@ -990,10 +1156,12 @@
     var title = document.getElementById('fTitle').value.trim();
     var url = document.getElementById('fUrl').value.trim();
     var description = document.getElementById('fDesc').value.trim();
-    var category = document.getElementById('fCategory').value.trim() || "Uncategorized";
-    var subcategory = document.getElementById('fSubcategory').value.trim();
+    var eventDate = document.getElementById('fEventDate').value || todayStr();
+    var category = currentCategoryValue() || "Uncategorized";
+    var subcategory = currentSubcategoryValue();
 
     if(!url){ showToast("A URL is required"); return; }
+    if(!category){ showToast("A category is required"); return; }
 
     if(state.editingId){
       var link = state.data.links.find(function(l){ return l.id === state.editingId; });
@@ -1001,6 +1169,7 @@
         link.title = title || url;
         link.url = url;
         link.description = description;
+        link.eventDate = eventDate;
         link.category = category;
         link.subcategory = subcategory;
       }
@@ -1011,6 +1180,7 @@
         title: title || url,
         url: url,
         description: description,
+        eventDate: eventDate,
         category: category,
         subcategory: subcategory,
         dateAdded: new Date().toISOString()
@@ -1124,6 +1294,7 @@
             title: l.title || url,
             url: url,
             description: l.description || "",
+            eventDate: l.eventDate || (l.dateAdded || "").slice(0,10) || todayStr(),
             category: l.category || "Uncategorized",
             subcategory: l.subcategory || "",
             dateAdded: l.dateAdded || new Date().toISOString()
@@ -1143,6 +1314,7 @@
             title: p.title || url,
             url: url,
             description: p.description || "",
+            eventDate: p.eventDate || "",
             category: p.category || "",
             subcategory: p.subcategory || "",
             dateAdded: p.dateAdded || new Date().toISOString()
@@ -1167,6 +1339,8 @@
   document.getElementById('cancelModalBtn').addEventListener('click', closeModal);
   document.getElementById('saveLinkBtn').addEventListener('click', saveLinkFromModal);
   document.getElementById('deleteLinkBtn').addEventListener('click', deleteFromModal);
+  document.getElementById('fCategorySelect').addEventListener('change', handleCategorySelectChange);
+  document.getElementById('fSubcategorySelect').addEventListener('change', handleSubcategorySelectChange);
   document.getElementById('linkModalOverlay').addEventListener('click', function(e){
     if(e.target === this) closeModal();
   });
@@ -1197,8 +1371,10 @@
   });
 
   document.getElementById('themeToggleBtn').addEventListener('click', toggleTheme);
+  document.getElementById('sortToggleBtn').addEventListener('click', toggleSort);
 
   initTheme();
+  initSort();
   renderAll();
 })();
 </script>
